@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>子機 - 案内ロボット</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <div class="clientApp">
+    <header class="clientHeader">
+      <div>
+        <p class="entryBadge">Client Device</p>
+        <h1>案内ロボット 子機</h1>
+        <p>利用者位置と目的地を指定して、案内開始を押します。</p>
+      </div>
+
+      <a class="backLink" href="../">トップへ戻る</a>
+    </header>
+
+    <main class="clientMain">
+      <section class="clientMapPanel">
+        <div class="clientStatusBar">
+          <div>状態: <strong id="clientStatus">WAITING</strong></div>
+          <div>選択: <strong id="clientToolLabel">利用者位置</strong></div>
+        </div>
+
+        <div class="canvasWrap clientCanvasWrap">
+          <canvas id="clientMapCanvas"></canvas>
+        </div>
+      </section>
+
+      <aside class="clientSidePanel">
+        <section class="panel">
+          <h2>子機操作</h2>
+
+          <div class="buttonGrid">
+            <button id="toolUser" class="active">利用者位置</button>
+            <button id="toolGoal">目的地</button>
+            <button id="toolErase">消去</button>
+          </div>
+
+          <button id="btnGuideRequest" class="wideButton">案内開始</button>
+        </section>
+
+        <section class="panel">
+          <h2>現在の指定</h2>
+          <div class="clientInfoList">
+            <div>
+              <span>利用者位置</span>
+              <strong id="userPositionLabel">未設定</strong>
+            </div>
+            <div>
+              <span>目的地</span>
+              <strong id="goalPositionLabel">未設定</strong>
+            </div>
+            <div>
+              <span>ロボット現在位置</span>
+              <strong id="robotPositionLabel">未設定</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>ログ</h2>
+          <textarea id="clientLogOutput" readonly></textarea>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="../js/client.js"></script>
+</body>
+</html>

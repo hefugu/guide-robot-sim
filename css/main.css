@@ -12,14 +12,19 @@
 
   --wall: #111111;
   --home: #3498db;
+  --robot: #f39c12;
   --user: #e74c3c;
   --goal: #2ecc71;
   --obstacle: #9b59b6;
-  --grid: rgba(255, 255, 255, 0.16);
 }
 
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
@@ -62,6 +67,70 @@ button.active {
   font-weight: 700;
 }
 
+a {
+  color: inherit;
+}
+
+.entryPage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--text);
+  padding: 24px;
+}
+
+.entryCard {
+  width: min(560px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 28px;
+  text-align: center;
+}
+
+.entryBadge {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.entryCard h1 {
+  margin: 0 0 12px;
+  font-size: 30px;
+}
+
+.entryText {
+  margin: 0 0 22px;
+  color: var(--muted);
+}
+
+.entryButtons {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.entryButtons a,
+.backLink {
+  display: inline-block;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.entryButtons a:hover,
+.backLink:hover {
+  border-color: var(--accent);
+}
+
 .app {
   display: grid;
   grid-template-columns: 260px 1fr;
@@ -93,6 +162,7 @@ button.active {
   margin: 0 0 8px;
   font-size: 13px;
 }
+
 .field {
   display: grid;
   gap: 4px;
@@ -133,12 +203,6 @@ input[type="file"] {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.modeStatus {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
 .hidden {
   display: none;
 }
@@ -173,6 +237,10 @@ input[type="file"] {
 
 .chip.home {
   background: var(--home);
+}
+
+.chip.robot {
+  background: var(--robot);
 }
 
 .chip.user {
@@ -213,7 +281,8 @@ input[type="file"] {
   overflow: hidden;
 }
 
-#mapCanvas {
+#mapCanvas,
+#clientMapCanvas {
   background: #ffffff;
   border: 1px solid var(--line);
   max-width: 100%;
@@ -246,9 +315,9 @@ input[type="file"] {
   font-size: 14px;
 }
 
-#logOutput {
+#logOutput,
+#clientLogOutput {
   width: 100%;
-  height: 135px;
   resize: none;
   border: 1px solid var(--line);
   background: #080b10;
@@ -256,6 +325,14 @@ input[type="file"] {
   border-radius: 8px;
   padding: 8px;
   font-size: 12px;
+}
+
+#logOutput {
+  height: 135px;
+}
+
+#clientLogOutput {
+  height: 220px;
 }
 
 #stateOutput {
@@ -268,6 +345,92 @@ input[type="file"] {
   padding: 8px;
   margin: 0;
   font-size: 11px;
+}
+
+.clientApp {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.clientHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.clientHeader h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.clientHeader p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.clientMain {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+}
+
+.clientMapPanel {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.clientStatusBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #111722;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.clientCanvasWrap {
+  min-height: 0;
+}
+
+.clientSidePanel {
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.wideButton {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.clientInfoList {
+  display: grid;
+  gap: 8px;
+}
+
+.clientInfoList div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+.clientInfoList span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {
@@ -288,10 +451,29 @@ input[type="file"] {
 
   .bottomArea {
     grid-template-columns: 1fr;
+    height: auto;
   }
 
   .logPanel {
     border-right: none;
     border-bottom: 1px solid var(--line);
+  }
+
+  .clientHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .clientMain {
+    grid-template-columns: 1fr;
+  }
+
+  .clientSidePanel {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .entryCard h1 {
+    font-size: 24px;
   }
 }

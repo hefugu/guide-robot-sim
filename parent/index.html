@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>親機 - 案内ロボットシミュレーター</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>案内ロボット<br>親機画面</h1>
+
+      <section class="panel">
+        <h2>マップ</h2>
+
+        <label class="field">
+          <span>マップ画像</span>
+          <input type="file" id="mapFile" accept="image/*">
+        </label>
+
+        <label class="field">
+          <span>白黒しきい値: <strong id="thresholdValue">180</strong></span>
+          <input type="range" id="thresholdInput" min="0" max="255" value="180">
+        </label>
+
+        <label class="field">
+          <span>グリッド列数</span>
+          <input type="number" id="gridColsInput" min="5" max="200" value="50">
+        </label>
+
+        <label class="field">
+          <span>グリッド行数</span>
+          <input type="number" id="gridRowsInput" min="5" max="200" value="50" readonly>
+        </label>
+
+        <label class="field">
+          <span>1マスの実寸 [cm]</span>
+          <input type="number" id="cellSizeInput" min="5" max="100" value="25">
+        </label>
+
+        <button id="btnGenerateGrid">マップ生成</button>
+      </section>
+
+      <section class="panel">
+        <h2>親機操作</h2>
+
+        <div class="buttonGrid">
+          <button id="toolHome" class="active">待機位置</button>
+          <button id="toolObstacle">障害物</button>
+          <button id="toolErase">消去</button>
+        </div>
+
+        <label class="field">
+          <span>ロボット初期向き</span>
+          <select id="directionSelect">
+            <option value="N">上 / N</option>
+            <option value="E" selected>右 / E</option>
+            <option value="S">下 / S</option>
+            <option value="W">左 / W</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>操作</h2>
+        <div class="buttonGrid two">
+          <button id="btnResetAll">全リセット</button>
+          <button id="btnClearLog">ログ消去</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>凡例</h2>
+        <ul class="legend">
+          <li><span class="chip wall"></span>壁</li>
+          <li><span class="chip home"></span>待機位置</li>
+          <li><span class="chip robot"></span>ロボット現在位置</li>
+          <li><span class="chip user"></span>利用者位置</li>
+          <li><span class="chip goal"></span>目的地</li>
+          <li><span class="chip obstacle"></span>障害物</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <a class="backLink" href="../">トップへ戻る</a>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="topBar">
+        <div>
+          状態: <strong id="statusLabel">WAITING</strong>
+        </div>
+        <div>
+          選択ツール: <strong id="toolLabel">待機位置</strong>
+        </div>
+      </div>
+
+      <div class="canvasWrap">
+        <canvas id="mapCanvas"></canvas>
+      </div>
+
+      <div class="bottomArea">
+        <section class="logPanel">
+          <h2>ログ</h2>
+          <textarea id="logOutput" readonly></textarea>
+        </section>
+
+        <section class="infoPanel">
+          <h2>現在の設定</h2>
+          <pre id="stateOutput"></pre>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="../js/parent.js"></script>
+</body>
+</html>

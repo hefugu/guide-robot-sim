@@ -1,0 +1,297 @@
+:root {
+  --bg: #0f1117;
+  --panel: #171a22;
+  --panel2: #1f2430;
+  --text: #e8eaf0;
+  --muted: #9aa3b2;
+  --line: #303747;
+  --accent: #4da3ff;
+  --danger: #ff5c7a;
+  --good: #54d17a;
+  --warn: #ffd166;
+
+  --wall: #111111;
+  --home: #3498db;
+  --user: #e74c3c;
+  --goal: #2ecc71;
+  --obstacle: #9b59b6;
+  --grid: rgba(255, 255, 255, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #05111f;
+  font-weight: 700;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.sidebar h1 {
+  margin: 0 0 12px;
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.panel {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px;
+  margin-bottom: 9px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+input[type="number"],
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #10141d;
+  color: var(--text);
+  padding: 6px 7px;
+  font-size: 12px;
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+input[type="file"] {
+  font-size: 12px;
+}
+
+.buttonGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.buttonGrid.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.modeStatus {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hidden {
+  display: none;
+}
+
+.legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.chip.wall {
+  background: var(--wall);
+  border: 1px solid #555;
+}
+
+.chip.home {
+  background: var(--home);
+}
+
+.chip.user {
+  background: var(--user);
+}
+
+.chip.goal {
+  background: var(--goal);
+}
+
+.chip.obstacle {
+  background: var(--obstacle);
+}
+
+.main {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 34px 1fr 190px;
+  height: 100vh;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #111722;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.canvasWrap {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+}
+
+#mapCanvas {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+}
+
+.bottomArea {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--line);
+  min-height: 0;
+  height: 190px;
+}
+
+.logPanel,
+.infoPanel {
+  padding: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.logPanel {
+  border-right: 1px solid var(--line);
+}
+
+.logPanel h2,
+.infoPanel h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+#logOutput {
+  width: 100%;
+  height: 135px;
+  resize: none;
+  border: 1px solid var(--line);
+  background: #080b10;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+#stateOutput {
+  height: 135px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: #080b10;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 0;
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .main {
+    height: auto;
+    min-height: 100vh;
+    grid-template-rows: auto 70vh 260px;
+  }
+
+  .bottomArea {
+    grid-template-columns: 1fr;
+  }
+
+  .logPanel {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}

@@ -16,6 +16,13 @@ import {
   saveAppState,
 } from "./shared.js";
 
+import {
+  commandsToJson,
+  commandsToText,
+  mergeGuidePath,
+  pathToCommands,
+} from "./commands.js";
+
 const canvas = document.getElementById("mapCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -39,6 +46,7 @@ const elements = {
   statusLabel: document.getElementById("statusLabel"),
   toolLabel: document.getElementById("toolLabel"),
   logOutput: document.getElementById("logOutput"),
+  commandOutput: document.getElementById("commandOutput"),
   stateOutput: document.getElementById("stateOutput"),
 };
 
@@ -50,7 +58,7 @@ let currentTool = "home";
 let simulationTimer = null;
 let obstaclePauseTimer = null;
 let runningRequestId = null;
-let currentTargetMode = "IDLE"; // IDLE / TO_USER / TO_GOAL
+let currentTargetMode = "IDLE";
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -97,16 +105,21 @@ function updateStateOutput() {
       toUserLength: appState.paths.toUser.length,
       toGoalLength: appState.paths.toGoal.length,
     },
+    commands: {
+      count: appState.commands.list.length,
+    },
     request: appState.request,
     simulation: {
       runningRequestId,
       currentTargetMode,
       timerRunning: Boolean(simulationTimer),
+      obstaclePauseRunning: Boolean(obstaclePauseTimer),
     },
   };
 
   elements.statusLabel.textContent = appState.robot.status;
   elements.toolLabel.textContent = getToolLabel(currentTool);
+  elements.commandOutput.value = appState.commands.text || "";
   elements.stateOutput.textContent = JSON.stringify(view, null, 2);
 }
 
@@ -162,12 +175,34 @@ function eraseAt(cell) {
   }
 }
 
+function updateCommandsFromPaths() {
+  const mergedPath = mergeGuidePath(
+    appState.paths.toUser,
+    appState.paths.toGoal
+  );
+
+  const commands = pathToCommands(
+    mergedPath,
+    appState.robot.direction
+  );
+
+  appState.commands.list = commands;
+  appState.commands.text = commandsToText(commands);
+  appState.commands.json = commandsToJson(commands);
+}
+
 function refreshRoutesAfterEdit(reason) {
   clearPaths(appState);
 
   if (canCalculateGuidePaths(appState)) {
     const ok = calculateGuidePaths(appState);
-    log(ok ? `${reason}: 経路を再計算しました` : `${reason}: 経路探索に失敗しました`);
+
+    if (ok) {
+      updateCommandsFromPaths();
+      log(`${reason}: 経路と命令列を再計算しました`);
+    } else {
+      log(`${reason}: 経路探索に失敗しました`);
+    }
   } else {
     if (!appState.request.active) {
       appState.robot.status = "WAITING";
@@ -231,7 +266,6 @@ function handleCanvasClick(event) {
     log(`障害物を設定: (${cell.x}, ${cell.y})`);
 
     if (simulationTimer && appState.robot.position) {
-      // 走行中に障害物を置いた場合、次ステップで必ず再判定する。
       appState.robot.status = "REPLANNING";
     }
   }
@@ -358,6 +392,7 @@ function setError(message) {
 
   appState.robot.status = "ERROR";
   appState.request.active = false;
+  clearPaths(appState);
 
   appState = saveAppState(appState);
   render();
@@ -407,6 +442,9 @@ function pauseForObstacleAndReplan(blockedCell) {
       ? "GO_TO_USER"
       : "GUIDING_TO_GOAL";
 
+    calculateGuidePaths(appState);
+    updateCommandsFromPaths();
+
     appState = saveAppState(appState);
     render();
 
@@ -429,13 +467,19 @@ function startSimulationLoop() {
       return;
     }
 
-    if (currentTargetMode === "TO_USER" && isSameCell(currentPosition, appState.user.position)) {
+    if (
+      currentTargetMode === "TO_USER" &&
+      isSameCell(currentPosition, appState.user.position)
+    ) {
       currentTargetMode = "TO_GOAL";
       appState.robot.status = "GUIDING_TO_GOAL";
       log("利用者位置に到着。目的地への案内を開始します");
     }
 
-    if (currentTargetMode === "TO_GOAL" && isSameCell(currentPosition, appState.goal.position)) {
+    if (
+      currentTargetMode === "TO_GOAL" &&
+      isSameCell(currentPosition, appState.goal.position)
+    ) {
       finishArrived();
       return;
     }
@@ -465,6 +509,7 @@ function startSimulationLoop() {
     }
 
     calculateGuidePaths(appState);
+    updateCommandsFromPaths();
 
     appState = saveAppState(appState);
     render();
@@ -490,6 +535,8 @@ function startSimulationIfNeeded() {
     setError("案内開始失敗: 経路が見つかりません");
     return;
   }
+
+  updateCommandsFromPaths();
 
   runningRequestId = appState.request.id;
   currentTargetMode = "TO_USER";
@@ -551,6 +598,7 @@ function resetAll() {
   elements.gridRowsInput.value = "50";
   elements.cellSizeInput.value = "25";
   elements.directionSelect.value = "E";
+  elements.commandOutput.value = "";
 
   log("全リセットしました");
   render();

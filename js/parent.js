@@ -47,6 +47,8 @@ const elements = {
   toolLabel: document.getElementById("toolLabel"),
   logOutput: document.getElementById("logOutput"),
   commandOutput: document.getElementById("commandOutput"),
+  btnCopyCommandJson: document.getElementById("btnCopyCommandJson"),
+  btnDownloadCommandJson: document.getElementById("btnDownloadCommandJson"),
   stateOutput: document.getElementById("stateOutput"),
 };
 
@@ -189,6 +191,71 @@ function updateCommandsFromPaths() {
   appState.commands.list = commands;
   appState.commands.text = commandsToText(commands);
   appState.commands.json = commandsToJson(commands);
+}
+
+function getCommandJsonForExport() {
+  const json = appState.commands.json;
+
+  if (json && json.trim().length > 0) {
+    return json;
+  }
+
+  return JSON.stringify(appState.commands.list ?? [], null, 2);
+}
+
+async function copyCommandJson() {
+  const json = getCommandJsonForExport();
+
+  if (!json || json === "[]") {
+    log("JSONコピー不可: 命令列がありません");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(json);
+    log("命令列JSONをクリップボードにコピーしました");
+  } catch {
+    const temp = document.createElement("textarea");
+    temp.value = json;
+    document.body.appendChild(temp);
+    temp.select();
+    document.execCommand("copy");
+    document.body.removeChild(temp);
+
+    log("命令列JSONをクリップボードにコピーしました");
+  }
+}
+
+function downloadCommandJson() {
+  const json = getCommandJsonForExport();
+
+  if (!json || json === "[]") {
+    log("JSON保存不可: 命令列がありません");
+    return;
+  }
+
+  const blob = new Blob([json], {
+    type: "application/json",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  const timestamp = new Date()
+    .toISOString()
+    .replaceAll(":", "-")
+    .replaceAll(".", "-");
+
+  link.href = url;
+  link.download = `test_commands_${timestamp}.json`;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+
+  log("命令列JSONを保存しました");
 }
 
 function refreshRoutesAfterEdit(reason) {
@@ -594,9 +661,9 @@ function resetAll() {
   elements.mapFile.value = "";
   elements.thresholdInput.value = "180";
   elements.thresholdValue.textContent = "180";
-  elements.gridColsInput.value = "50";
+  elements.gridColsInput.value = "141";
   elements.gridRowsInput.value = "50";
-  elements.cellSizeInput.value = "25";
+  elements.cellSizeInput.value = "50";
   elements.directionSelect.value = "E";
   elements.commandOutput.value = "";
 
@@ -638,6 +705,9 @@ function bindEvents() {
     elements.logOutput.value = "";
   });
 
+  elements.btnCopyCommandJson.addEventListener("click", copyCommandJson);
+  elements.btnDownloadCommandJson.addEventListener("click", downloadCommandJson);
+
   canvas.addEventListener("click", handleCanvasClick);
 
   window.addEventListener("storage", () => {
@@ -658,9 +728,9 @@ async function init() {
 
   elements.thresholdInput.value = String(appState.map.threshold);
   elements.thresholdValue.textContent = String(appState.map.threshold);
-  elements.gridColsInput.value = String(appState.map.cols);
-  elements.gridRowsInput.value = String(appState.map.rows);
-  elements.cellSizeInput.value = String(appState.map.cellSizeCm);
+  elements.gridColsInput.value = String(appState.map.cols || 141);
+  elements.gridRowsInput.value = String(appState.map.rows || 50);
+  elements.cellSizeInput.value = String(appState.map.cellSizeCm || 50);
   elements.directionSelect.value = appState.robot.direction;
 
   setTool("home");

@@ -344,6 +344,30 @@ input[type="file"] {
   font-size: 14px;
 }
 
+.panelHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.panelHeaderRow h2 {
+  margin: 0;
+}
+
+.smallButtonGroup {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.smallButtonGroup button {
+  padding: 4px 7px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
 #logOutput,
 #commandOutput,
 #clientLogOutput {

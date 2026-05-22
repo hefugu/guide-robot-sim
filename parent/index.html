@@ -26,17 +26,17 @@
 
         <label class="field">
           <span>グリッド列数</span>
-          <input type="number" id="gridColsInput" min="5" max="200" value="50">
+          <input type="number" id="gridColsInput" min="5" max="500" value="141">
         </label>
 
         <label class="field">
           <span>グリッド行数</span>
-          <input type="number" id="gridRowsInput" min="5" max="200" value="50" readonly>
+          <input type="number" id="gridRowsInput" min="5" max="500" value="50" readonly>
         </label>
 
         <label class="field">
           <span>1マスの実寸 [cm]</span>
-          <input type="number" id="cellSizeInput" min="5" max="100" value="25">
+          <input type="number" id="cellSizeInput" min="5" max="200" value="50">
         </label>
 
         <button id="btnGenerateGrid">マップ生成</button>
@@ -108,7 +108,15 @@
         </section>
 
         <section class="infoPanel">
-          <h2>命令列</h2>
+          <div class="panelHeaderRow">
+            <h2>命令列</h2>
+
+            <div class="smallButtonGroup">
+              <button id="btnCopyCommandJson" type="button">JSONコピー</button>
+              <button id="btnDownloadCommandJson" type="button">JSON保存</button>
+            </div>
+          </div>
+
           <textarea id="commandOutput" readonly></textarea>
         </section>
 

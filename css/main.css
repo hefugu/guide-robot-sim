@@ -67,9 +67,18 @@ button.active {
   font-weight: 700;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 a {
   color: inherit;
 }
+
+/* =========================
+   Entry page
+========================= */
 
 .entryPage {
   min-height: 100vh;
@@ -130,6 +139,10 @@ a {
 .backLink:hover {
   border-color: var(--accent);
 }
+
+/* =========================
+   Parent app layout
+========================= */
 
 .app {
   display: grid;
@@ -207,6 +220,13 @@ input[type="file"] {
   display: none;
 }
 
+.hintText {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .legend {
   list-style: none;
   padding: 0;
@@ -273,6 +293,10 @@ input[type="file"] {
   font-size: 12px;
 }
 
+.topBar strong {
+  color: var(--text);
+}
+
 .canvasWrap {
   display: grid;
   place-items: center;
@@ -298,15 +322,20 @@ input[type="file"] {
   height: 190px;
 }
 
+.bottomArea.three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .logPanel,
 .infoPanel {
   padding: 10px;
   min-width: 0;
   min-height: 0;
+  border-right: 1px solid var(--line);
 }
 
-.logPanel {
-  border-right: 1px solid var(--line);
+.bottomArea > section:last-child {
+  border-right: none;
 }
 
 .logPanel h2,
@@ -316,6 +345,7 @@ input[type="file"] {
 }
 
 #logOutput,
+#commandOutput,
 #clientLogOutput {
   width: 100%;
   resize: none;
@@ -325,9 +355,20 @@ input[type="file"] {
   border-radius: 8px;
   padding: 8px;
   font-size: 12px;
+  line-height: 1.45;
 }
 
-#logOutput {
+#commandOutput {
+  font-family:
+    "Cascadia Mono",
+    "Consolas",
+    "Menlo",
+    monospace;
+  white-space: pre;
+}
+
+#logOutput,
+#commandOutput {
   height: 135px;
 }
 
@@ -345,7 +386,12 @@ input[type="file"] {
   padding: 8px;
   margin: 0;
   font-size: 11px;
+  line-height: 1.4;
 }
+
+/* =========================
+   Client app layout
+========================= */
 
 .clientApp {
   min-height: 100vh;
@@ -399,6 +445,10 @@ input[type="file"] {
   font-size: 12px;
 }
 
+.clientStatusBar strong {
+  color: var(--text);
+}
+
 .clientCanvasWrap {
   min-height: 0;
 }
@@ -433,6 +483,16 @@ input[type="file"] {
   font-size: 12px;
 }
 
+.clientInfoList strong {
+  font-size: 12px;
+  color: var(--text);
+  text-align: right;
+}
+
+/* =========================
+   Responsive
+========================= */
+
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;
@@ -446,17 +506,29 @@ input[type="file"] {
   .main {
     height: auto;
     min-height: 100vh;
-    grid-template-rows: auto 70vh 260px;
+    grid-template-rows: auto 70vh auto;
   }
 
-  .bottomArea {
+  .bottomArea,
+  .bottomArea.three {
     grid-template-columns: 1fr;
     height: auto;
   }
 
-  .logPanel {
+  .logPanel,
+  .infoPanel {
     border-right: none;
     border-bottom: 1px solid var(--line);
+  }
+
+  .bottomArea > section:last-child {
+    border-bottom: none;
+  }
+
+  #logOutput,
+  #commandOutput,
+  #stateOutput {
+    height: 150px;
   }
 
   .clientHeader {

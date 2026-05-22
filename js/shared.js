@@ -41,6 +41,12 @@ export function createDefaultState() {
       toGoal: [],
     },
 
+    commands: {
+    list: [],
+      text: "",
+      json: "",
+    },
+
     request: {
       active: false,
       id: 0,
@@ -83,6 +89,11 @@ export function normalizeState(rawState) {
     paths: {
       ...defaultState.paths,
       ...(state.paths ?? {}),
+    },
+
+    commands: {
+      ...defaultState.commands,
+      ...(state.commands ?? {}),
     },
 
     request: {
@@ -389,6 +400,10 @@ export function reconstructPath(parent, start, goal) {
 export function clearPaths(state) {
   state.paths.toUser = [];
   state.paths.toGoal = [];
+
+  state.commands.list = [];
+  state.commands.text = "";
+  state.commands.json = "";
 }
 
 export function canCalculateGuidePaths(state) {

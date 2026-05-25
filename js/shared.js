@@ -13,10 +13,10 @@ export function createDefaultState() {
       imageHeight: 0,
       imageLoaded: false,
       grid: [],
-      cols: 50,
+      cols: 141,
       rows: 50,
       threshold: 180,
-      cellSizeCm: 25,
+      cellSizeCm: 50,
     },
 
     robot: {

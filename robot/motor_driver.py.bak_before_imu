@@ -1,0 +1,297 @@
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+from typing import Literal
+
+from gpiozero import DigitalOutputDevice, Servo
+from gpiozero.pins.lgpio import LGPIOFactory
+
+
+TurnMode = Literal[
+    "STEER_AND_ONE_SIDE",
+    "STEER_AND_BOTH_FORWARD",
+    "STEER_AND_DIFF",
+]
+
+
+@dataclass(frozen=True)
+class RobotPins:
+    # EN pins are connected directly to 5V.
+    # This driver controls only IN pins.
+    in1_l: int = 5
+    in2_l: int = 6
+
+    in1_r: int = 23
+    in2_r: int = 24
+
+    servo: int = 18
+
+
+@dataclass
+class RobotConfig:
+    forward_one_cell_seconds: float = 0.80
+    left_90_seconds: float = 0.55
+    right_90_seconds: float = 0.55
+
+    # Digital ON/OFF版では motor_speed / turn_speed は今は使わない。
+    # command_runner.py との互換用に残す。
+    motor_speed: float = 1.00
+    turn_speed: float = 1.00
+
+    servo_center_value: float = 0.0
+    servo_left_value: float = -0.85
+    servo_right_value: float = 0.85
+
+    servo_settle_seconds: float = 0.18
+    stop_delay_seconds: float = 0.15
+
+    turn_mode: TurnMode = "STEER_AND_ONE_SIDE"
+
+
+class RobotDriver:
+    def __init__(
+        self,
+        pins: RobotPins | None = None,
+        config: RobotConfig | None = None,
+        dry_run: bool = True,
+    ) -> None:
+        self.pins = pins or RobotPins()
+        self.config = config or RobotConfig()
+        self.dry_run = dry_run
+
+        self.pin_factory: LGPIOFactory | None = None
+
+        self.left_in1: DigitalOutputDevice | None = None
+        self.left_in2: DigitalOutputDevice | None = None
+        self.right_in1: DigitalOutputDevice | None = None
+        self.right_in2: DigitalOutputDevice | None = None
+
+        self.servo: Servo | None = None
+
+    def __enter__(self) -> "RobotDriver":
+        self.setup()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.cleanup()
+
+    def setup(self) -> None:
+        if self.dry_run:
+            print("[DRY] setup digital robot driver without EN pins")
+            return
+
+        self.pin_factory = LGPIOFactory()
+
+        self.left_in1 = DigitalOutputDevice(
+            self.pins.in1_l,
+            pin_factory=self.pin_factory,
+        )
+        self.left_in2 = DigitalOutputDevice(
+            self.pins.in2_l,
+            pin_factory=self.pin_factory,
+        )
+
+        self.right_in1 = DigitalOutputDevice(
+            self.pins.in1_r,
+            pin_factory=self.pin_factory,
+        )
+        self.right_in2 = DigitalOutputDevice(
+            self.pins.in2_r,
+            pin_factory=self.pin_factory,
+        )
+
+        self.servo = Servo(
+            self.pins.servo,
+            min_pulse_width=0.0005,
+            max_pulse_width=0.0025,
+            pin_factory=self.pin_factory,
+        )
+
+        self.stop()
+        self.servo_center()
+
+    def cleanup(self) -> None:
+        try:
+            self.stop()
+            self.servo_center()
+        finally:
+            if self.dry_run:
+                print("[DRY] cleanup digital robot driver without EN pins")
+                return
+
+            devices = [
+                self.left_in1,
+                self.left_in2,
+                self.right_in1,
+                self.right_in2,
+                self.servo,
+            ]
+
+            for device in devices:
+                if device is not None:
+                    device.close()
+
+            self.left_in1 = None
+            self.left_in2 = None
+            self.right_in1 = None
+            self.right_in2 = None
+            self.servo = None
+            self.pin_factory = None
+
+    def _sleep(self, seconds: float) -> None:
+        time.sleep(max(0.0, float(seconds)))
+
+    def _on(self, device: DigitalOutputDevice | None, name: str) -> None:
+        if self.dry_run:
+            print(f"[DRY] {name}=ON")
+            return
+
+        assert device is not None
+        device.on()
+
+    def _off(self, device: DigitalOutputDevice | None, name: str) -> None:
+        if self.dry_run:
+            print(f"[DRY] {name}=OFF")
+            return
+
+        assert device is not None
+        device.off()
+
+    def left_forward(self) -> None:
+        print("ACTION: left motor FORWARD")
+        self._on(self.left_in1, "LEFT_IN1")
+        self._off(self.left_in2, "LEFT_IN2")
+
+    def left_backward(self) -> None:
+        print("ACTION: left motor BACKWARD")
+        self._off(self.left_in1, "LEFT_IN1")
+        self._on(self.left_in2, "LEFT_IN2")
+
+    def left_stop(self) -> None:
+        print("ACTION: left motor STOP")
+        self._off(self.left_in1, "LEFT_IN1")
+        self._off(self.left_in2, "LEFT_IN2")
+
+    def right_forward(self) -> None:
+        print("ACTION: right motor FORWARD")
+        self._on(self.right_in1, "RIGHT_IN1")
+        self._off(self.right_in2, "RIGHT_IN2")
+
+    def right_backward(self) -> None:
+        print("ACTION: right motor BACKWARD")
+        self._off(self.right_in1, "RIGHT_IN1")
+        self._on(self.right_in2, "RIGHT_IN2")
+
+    def right_stop(self) -> None:
+        print("ACTION: right motor STOP")
+        self._off(self.right_in1, "RIGHT_IN1")
+        self._off(self.right_in2, "RIGHT_IN2")
+
+    def set_motors(self, left_speed: float, right_speed: float) -> None:
+        # Digital版なので、速度の絶対値は無視。
+        # 符号だけ見る。
+        if left_speed > 0:
+            self.left_forward()
+        elif left_speed < 0:
+            self.left_backward()
+        else:
+            self.left_stop()
+
+        if right_speed > 0:
+            self.right_forward()
+        elif right_speed < 0:
+            self.right_backward()
+        else:
+            self.right_stop()
+
+    def stop(self) -> None:
+        print("ACTION: STOP motors")
+        self.left_stop()
+        self.right_stop()
+        self._sleep(self.config.stop_delay_seconds)
+
+    def _set_servo(self, value: float, label: str) -> None:
+        value = max(-1.0, min(1.0, float(value)))
+
+        print(f"ACTION: servo {label}")
+
+        if self.dry_run:
+            print(f"[DRY] servo={value:.2f}")
+        else:
+            assert self.servo is not None
+            self.servo.value = value
+
+        self._sleep(self.config.servo_settle_seconds)
+
+    def servo_center(self) -> None:
+        self._set_servo(self.config.servo_center_value, "CENTER")
+
+    def servo_left(self) -> None:
+        self._set_servo(self.config.servo_left_value, "LEFT")
+
+    def servo_right(self) -> None:
+        self._set_servo(self.config.servo_right_value, "RIGHT")
+
+    def forward_one_cell(self) -> None:
+        print("ACTION: FORWARD one cell")
+        self.servo_center()
+        self.set_motors(1.0, 1.0)
+        self._sleep(self.config.forward_one_cell_seconds)
+        self.stop()
+
+    def turn_left_90(self) -> None:
+        print("ACTION: LEFT 90")
+        self.stop()
+        self.servo_left()
+
+        if self.config.turn_mode == "STEER_AND_ONE_SIDE":
+            self.set_motors(0.0, 1.0)
+        elif self.config.turn_mode == "STEER_AND_BOTH_FORWARD":
+            self.set_motors(1.0, 1.0)
+        elif self.config.turn_mode == "STEER_AND_DIFF":
+            self.set_motors(-1.0, 1.0)
+        else:
+            raise ValueError(f"Unknown turn_mode: {self.config.turn_mode}")
+
+        self._sleep(self.config.left_90_seconds)
+        self.stop()
+        self.servo_center()
+
+    def turn_right_90(self) -> None:
+        print("ACTION: RIGHT 90")
+        self.stop()
+        self.servo_right()
+
+        if self.config.turn_mode == "STEER_AND_ONE_SIDE":
+            self.set_motors(1.0, 0.0)
+        elif self.config.turn_mode == "STEER_AND_BOTH_FORWARD":
+            self.set_motors(1.0, 1.0)
+        elif self.config.turn_mode == "STEER_AND_DIFF":
+            self.set_motors(1.0, -1.0)
+        else:
+            raise ValueError(f"Unknown turn_mode: {self.config.turn_mode}")
+
+        self._sleep(self.config.right_90_seconds)
+        self.stop()
+        self.servo_center()
+
+    def execute_type(self, command_type: str) -> None:
+        if command_type == "FORWARD":
+            self.forward_one_cell()
+            return
+
+        if command_type == "LEFT":
+            self.turn_left_90()
+            return
+
+        if command_type == "RIGHT":
+            self.turn_right_90()
+            return
+
+        if command_type == "STOP":
+            self.stop()
+            self.servo_center()
+            return
+
+        raise ValueError(f"Unknown command type: {command_type}")

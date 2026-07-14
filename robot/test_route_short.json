@@ -1,0 +1,8 @@
+[
+  { "type": "FORWARD" },
+  { "type": "LEFT" },
+  { "type": "FORWARD" },
+  { "type": "RIGHT" },
+  { "type": "FORWARD" },
+  { "type": "STOP" }
+]

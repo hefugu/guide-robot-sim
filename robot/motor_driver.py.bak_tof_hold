@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 import smbus
 
@@ -10,7 +10,6 @@ import board
 import busio
 import adafruit_tca9548a
 import adafruit_vl53l1x
-
 from gpiozero import DigitalOutputDevice, Servo
 from gpiozero.pins.lgpio import LGPIOFactory
 
@@ -30,11 +29,6 @@ GYRO_SCALE = 131.0  # ±250 deg/s
 
 CommandType = Literal["FORWARD", "LEFT", "RIGHT", "STOP"]
 TurnMode = Literal["STEER_AND_ONE_SIDE", "STEER_AND_BOTH_FORWARD", "STEER_AND_DIFF"]
-TurnServoMode = Literal["CENTER", "STEER"]
-
-
-def clamp(value: float, min_value: float, max_value: float) -> float:
-    return max(min_value, min(max_value, value))
 
 
 @dataclass
@@ -62,8 +56,7 @@ class RobotConfig:
     turn_speed: float = 1.00
 
     # servo values
-    # 現状の車体では -0.03 付近が一番マシだったためデフォルトにする
-    servo_center_value: float = 0.0
+    servo_center_value: float = -0.03
     servo_left_value: float = 0.85
     servo_right_value: float = -0.85
 
@@ -71,11 +64,8 @@ class RobotConfig:
     servo_settle_seconds: float = 0.50
     stop_delay_seconds: float = 0.30
 
-    # command delay is handled in command_runner.py
+    # turn mode
     turn_mode: TurnMode = "STEER_AND_DIFF"
-
-    # 差動旋回時は前輪をセンターにした方が横流れしにくい
-    turn_servo_mode: TurnServoMode = "CENTER"
 
     # IMU turn settings
     use_imu_turn: bool = True
@@ -87,40 +77,18 @@ class RobotConfig:
 
     # IMU forward heading hold
     use_imu_forward: bool = True
-    forward_heading_kp: float = 0.020
-    forward_heading_limit: float = 0.25
+    forward_heading_kp: float = 0.025
+    forward_heading_limit: float = 0.15
     forward_loop_sleep: float = 0.03
 
     # ToF wall correction during forward
     use_tof_forward: bool = True
     tof_left_channel: int = 0
     tof_right_channel: int = 1
-
-    # 左右両壁が見える時の中央維持
-    tof_wall_kp: float = 0.0015
-
-    # 片側壁だけ見える時、そのFORWARD開始時の距離を維持する弱い補正
-    tof_single_wall_kp: float = 0.0012
-
-    # ToF補正の最大量
+    tof_wall_kp: float = 0.0010
     tof_wall_limit: float = 0.12
-
-    # VL53L1Xの有効距離範囲
     tof_min_valid_cm: float = 20.0
     tof_max_valid_cm: float = 300.0
-
-    # 廊下幅の目安。両側壁判定に使う。
-    tof_expected_width_cm: float = 290.0
-    tof_width_tolerance_cm: float = 65.0
-
-    # 片側がこれより遠い時は「壁ではなく階段/開口部かも」と判断
-    tof_side_wall_max_for_both_cm: float = 220.0
-
-    # ToFの平滑化
-    tof_smoothing_alpha: float = 0.35
-
-    # ToFが一時的に読めない時、前回補正を少しずつ抜く
-    tof_correction_decay: float = 0.85
 
 
 class MPU6050Gyro:
@@ -166,13 +134,14 @@ class MPU6050Gyro:
         try:
             z = self.read_gyro_z() - self.offset_z
         except OSError as error:
-            print(f"\nWARNING: MPU6050 I2C read failed: {error}")
+            print(f"\\nWARNING: MPU6050 I2C read failed: {error}")
             return 0.0
 
         if abs(z) < deadband:
             return 0.0
 
         return z
+
 
 
 class WallToFSensors:
@@ -188,10 +157,10 @@ class WallToFSensors:
         self.min_valid_cm = min_valid_cm
         self.max_valid_cm = max_valid_cm
 
-        self.i2c: Any | None = None
-        self.tca: Any | None = None
-        self.left_sensor: Any | None = None
-        self.right_sensor: Any | None = None
+        self.i2c = None
+        self.tca = None
+        self.left_sensor = None
+        self.right_sensor = None
         self.is_ready = False
 
     def setup(self) -> None:
@@ -209,7 +178,7 @@ class WallToFSensors:
             f"(left CH{self.left_channel}, right CH{self.right_channel})"
         )
 
-    def _make_sensor(self, channel: int) -> Any:
+    def _make_sensor(self, channel: int):
         assert self.tca is not None
 
         sensor = adafruit_vl53l1x.VL53L1X(self.tca[channel])
@@ -223,7 +192,7 @@ class WallToFSensors:
         sensor.start_ranging()
         return sensor
 
-    def _read_sensor_cm(self, sensor: Any | None) -> float | None:
+    def _read_sensor_cm(self, sensor) -> float | None:
         if sensor is None:
             return None
 
@@ -299,10 +268,6 @@ class RobotDriver:
         self.close()
 
     def setup(self) -> None:
-        if self.dry_run:
-            print("DRY RUN: RobotDriver setup skipped.")
-            return
-
         self.left_in1 = DigitalOutputDevice(self.pins.in1_l, pin_factory=self.factory)
         self.left_in2 = DigitalOutputDevice(self.pins.in2_l, pin_factory=self.factory)
         self.right_in1 = DigitalOutputDevice(self.pins.in1_r, pin_factory=self.factory)
@@ -314,24 +279,20 @@ class RobotDriver:
         self.set_servo(self.config.servo_center_value)
         time.sleep(self.config.stop_delay_seconds)
 
-        if self.config.use_imu_turn or self.config.use_imu_forward:
+        if self.config.use_imu_turn:
             try:
                 self.gyro = MPU6050Gyro(bus_number=1)
                 self.gyro.setup()
                 self.gyro.calibrate_z(seconds=self.config.imu_calibration_seconds)
-                print("MPU6050 IMU mode: ENABLED")
+                print("MPU6050 IMU turn mode: ENABLED")
 
             except Exception as error:
                 print("WARNING: MPU6050 setup failed.")
                 print(f"Reason: {error}")
-                print("Fallback: timed turn / no heading hold will be used.")
+                print("Fallback: timed turn mode will be used.")
                 self.gyro = None
 
     def close(self) -> None:
-        if self.dry_run:
-            print("DRY RUN: RobotDriver close.")
-            return
-
         try:
             self.stop()
         except Exception as error:
@@ -364,9 +325,6 @@ class RobotDriver:
                 print(f"WARNING: {name} close failed: {error}")
 
     def require_devices(self) -> None:
-        if self.dry_run:
-            return
-
         if (
             self.left_in1 is None
             or self.left_in2 is None
@@ -378,21 +336,12 @@ class RobotDriver:
 
     def set_servo(self, value: float) -> None:
         self.require_devices()
-
-        value = clamp(value, -1.0, 1.0)
-
-        if self.dry_run:
-            print(f"DRY RUN: servo={value:.3f}")
-            return
-
         assert self.servo is not None
+
+        value = max(-1.0, min(1.0, value))
         self.servo.value = value
 
     def stop(self) -> None:
-        if self.dry_run:
-            print("DRY RUN: stop motors")
-            return
-
         if self.left_in1 is not None:
             self.left_in1.off()
         if self.left_in2 is not None:
@@ -404,11 +353,6 @@ class RobotDriver:
 
     def left_forward(self) -> None:
         self.require_devices()
-
-        if self.dry_run:
-            print("DRY RUN: left forward")
-            return
-
         assert self.left_in1 is not None
         assert self.left_in2 is not None
 
@@ -417,11 +361,6 @@ class RobotDriver:
 
     def left_backward(self) -> None:
         self.require_devices()
-
-        if self.dry_run:
-            print("DRY RUN: left backward")
-            return
-
         assert self.left_in1 is not None
         assert self.left_in2 is not None
 
@@ -430,11 +369,6 @@ class RobotDriver:
 
     def right_forward(self) -> None:
         self.require_devices()
-
-        if self.dry_run:
-            print("DRY RUN: right forward")
-            return
-
         assert self.right_in1 is not None
         assert self.right_in2 is not None
 
@@ -443,11 +377,6 @@ class RobotDriver:
 
     def right_backward(self) -> None:
         self.require_devices()
-
-        if self.dry_run:
-            print("DRY RUN: right backward")
-            return
-
         assert self.right_in1 is not None
         assert self.right_in2 is not None
 
@@ -455,10 +384,6 @@ class RobotDriver:
         self.right_in2.on()
 
     def set_motors(self, left_speed: float, right_speed: float) -> None:
-        if self.dry_run:
-            print(f"DRY RUN: motors left={left_speed:.2f} right={right_speed:.2f}")
-            return
-
         if left_speed > 0:
             self.left_forward()
         elif left_speed < 0:
@@ -479,149 +404,6 @@ class RobotDriver:
             self.right_in1.off()
             self.right_in2.off()
 
-    def setup_tof_if_needed(self) -> None:
-        if self.dry_run:
-            return
-
-        if not self.config.use_tof_forward:
-            return
-
-        if self.wall_sensors is not None:
-            return
-
-        try:
-            self.wall_sensors = WallToFSensors(
-                left_channel=self.config.tof_left_channel,
-                right_channel=self.config.tof_right_channel,
-                min_valid_cm=self.config.tof_min_valid_cm,
-                max_valid_cm=self.config.tof_max_valid_cm,
-            )
-            self.wall_sensors.setup()
-
-        except Exception as error:
-            print("WARNING: ToF wall sensors setup failed.")
-            print(f"Reason: {error}")
-            print("Fallback: IMU-only forward correction will be used.")
-            self.wall_sensors = None
-
-    def smooth_value(self, previous: float | None, new_value: float | None) -> float | None:
-        if new_value is None:
-            return previous
-
-        if previous is None:
-            return new_value
-
-        alpha = self.config.tof_smoothing_alpha
-        return previous * (1.0 - alpha) + new_value * alpha
-
-    def compute_tof_wall_correction(
-        self,
-        left_cm: float | None,
-        right_cm: float | None,
-        left_baseline_cm: float | None,
-        right_baseline_cm: float | None,
-        last_wall_correction: float,
-    ) -> tuple[float, str, float | None, float | None, float | None]:
-        """
-        Returns:
-            correction
-            mode
-            wall_error
-            new_left_baseline
-            new_right_baseline
-        """
-
-        new_left_baseline = left_baseline_cm
-        new_right_baseline = right_baseline_cm
-
-        if left_cm is None and right_cm is None:
-            return (
-                last_wall_correction * self.config.tof_correction_decay,
-                "IMU_ONLY",
-                None,
-                new_left_baseline,
-                new_right_baseline,
-            )
-
-        left_wall_like = (
-            left_cm is not None
-            and left_cm <= self.config.tof_side_wall_max_for_both_cm
-        )
-
-        right_wall_like = (
-            right_cm is not None
-            and right_cm <= self.config.tof_side_wall_max_for_both_cm
-        )
-
-        # 両側が壁っぽく、合計幅も廊下幅として自然なら中央維持
-        if left_wall_like and right_wall_like and left_cm is not None and right_cm is not None:
-            width_cm = left_cm + right_cm
-            min_width = self.config.tof_expected_width_cm - self.config.tof_width_tolerance_cm
-            max_width = self.config.tof_expected_width_cm + self.config.tof_width_tolerance_cm
-
-            if min_width <= width_cm <= max_width:
-                wall_error = left_cm - right_cm
-
-                # wall_error < 0:
-                #   左壁が近い -> 車体が左寄り -> 右へ補正 -> negative
-                #
-                # wall_error > 0:
-                #   右壁が近い -> 車体が右寄り -> 左へ補正 -> positive
-                correction = wall_error * self.config.tof_wall_kp
-                correction = clamp(
-                    correction,
-                    -self.config.tof_wall_limit,
-                    self.config.tof_wall_limit,
-                )
-
-                return correction, "BOTH_WALLS", wall_error, new_left_baseline, new_right_baseline
-
-        # 片側だけ壁っぽい時は「固定目標距離」ではなく、
-        # そのFORWARD開始時の距離を維持する。
-        # これなら階段/開口部の位置やロボの向きが変わっても破綻しにくい。
-        if left_wall_like and left_cm is not None and not right_wall_like:
-            if new_left_baseline is None:
-                new_left_baseline = left_cm
-
-            wall_error = left_cm - new_left_baseline
-
-            # left_cm が小さくなった -> 左壁に近づいた -> 右へ補正 -> negative
-            # left_cm が大きくなった -> 左壁から離れた -> 左へ補正 -> positive
-            correction = wall_error * self.config.tof_single_wall_kp
-            correction = clamp(
-                correction,
-                -self.config.tof_wall_limit,
-                self.config.tof_wall_limit,
-            )
-
-            return correction, "LEFT_WALL_HOLD", wall_error, new_left_baseline, new_right_baseline
-
-        if right_wall_like and right_cm is not None and not left_wall_like:
-            if new_right_baseline is None:
-                new_right_baseline = right_cm
-
-            wall_error = new_right_baseline - right_cm
-
-            # right_cm が小さくなった -> 右壁に近づいた -> 左へ補正 -> positive
-            # right_cm が大きくなった -> 右壁から離れた -> 右へ補正 -> negative
-            correction = wall_error * self.config.tof_single_wall_kp
-            correction = clamp(
-                correction,
-                -self.config.tof_wall_limit,
-                self.config.tof_wall_limit,
-            )
-
-            return correction, "RIGHT_WALL_HOLD", wall_error, new_left_baseline, new_right_baseline
-
-        # 階段/開口部/値飛びっぽい時はToFを弱めて、IMU主体に戻す
-        return (
-            last_wall_correction * self.config.tof_correction_decay,
-            "IMU_ONLY",
-            None,
-            new_left_baseline,
-            new_right_baseline,
-        )
-
     def forward_one_cell(self) -> None:
         self.require_devices()
 
@@ -633,31 +415,37 @@ class RobotDriver:
         self.set_servo(self.config.servo_center_value)
         time.sleep(self.config.servo_settle_seconds)
 
-        self.setup_tof_if_needed()
-
         use_heading_hold = (
             self.config.use_imu_forward
             and self.gyro is not None
         )
 
-        use_tof = (
-            self.config.use_tof_forward
-            and self.wall_sensors is not None
-        )
+        use_tof = self.config.use_tof_forward
+
+        if use_tof and self.wall_sensors is None:
+            try:
+                self.wall_sensors = WallToFSensors(
+                    left_channel=self.config.tof_left_channel,
+                    right_channel=self.config.tof_right_channel,
+                    min_valid_cm=self.config.tof_min_valid_cm,
+                    max_valid_cm=self.config.tof_max_valid_cm,
+                )
+                self.wall_sensors.setup()
+
+            except Exception as error:
+                print("WARNING: ToF wall sensors setup failed.")
+                print(f"Reason: {error}")
+                print("Fallback: IMU-only forward correction will be used.")
+                self.wall_sensors = None
+                use_tof = False
 
         angle = 0.0
         last_time = time.monotonic()
         start_time = last_time
 
-        left_filtered: float | None = None
-        right_filtered: float | None = None
-
-        left_baseline_cm: float | None = None
-        right_baseline_cm: float | None = None
-
+        last_left_cm: float | None = None
+        last_right_cm: float | None = None
         last_wall_error: float | None = None
-        last_wall_correction = 0.0
-        tof_mode = "IMU_ONLY"
 
         self.set_motors(1.0, 1.0)
 
@@ -672,7 +460,7 @@ class RobotDriver:
                 imu_correction = 0.0
                 wall_correction = 0.0
 
-                if use_heading_hold and self.gyro is not None:
+                if use_heading_hold:
                     corrected_z = self.gyro.read_corrected_z(
                         deadband=self.config.gyro_deadband
                     )
@@ -689,49 +477,49 @@ class RobotDriver:
                     imu_correction = -angle * self.config.forward_heading_kp
 
                 if use_tof and self.wall_sensors is not None:
-                    raw_left_cm, raw_right_cm = self.wall_sensors.read_left_right_cm()
+                    left_cm, right_cm = self.wall_sensors.read_left_right_cm()
 
-                    left_filtered = self.smooth_value(left_filtered, raw_left_cm)
-                    right_filtered = self.smooth_value(right_filtered, raw_right_cm)
+                    if left_cm is not None:
+                        last_left_cm = left_cm
 
-                    (
-                        wall_correction,
-                        tof_mode,
-                        last_wall_error,
-                        left_baseline_cm,
-                        right_baseline_cm,
-                    ) = self.compute_tof_wall_correction(
-                        left_cm=left_filtered,
-                        right_cm=right_filtered,
-                        left_baseline_cm=left_baseline_cm,
-                        right_baseline_cm=right_baseline_cm,
-                        last_wall_correction=last_wall_correction,
-                    )
+                    if right_cm is not None:
+                        last_right_cm = right_cm
 
-                    last_wall_correction = wall_correction
+                    if left_cm is not None and right_cm is not None:
+                        wall_error = left_cm - right_cm
+                        last_wall_error = wall_error
+
+                        # wall_error < 0:
+                        #   left wall is closer -> robot is left side
+                        #   steer right -> negative correction
+                        #
+                        # wall_error > 0:
+                        #   right wall is closer -> robot is right side
+                        #   steer left -> positive correction
+                        wall_correction = wall_error * self.config.tof_wall_kp
+
+                        wall_correction = max(
+                            -self.config.tof_wall_limit,
+                            min(self.config.tof_wall_limit, wall_correction),
+                        )
 
                 total_correction = imu_correction + wall_correction
-                total_correction = clamp(
-                    total_correction,
+                total_correction = max(
                     -self.config.forward_heading_limit,
-                    self.config.forward_heading_limit,
+                    min(self.config.forward_heading_limit, total_correction),
                 )
 
                 servo_value = self.config.servo_center_value + total_correction
-                servo_value = clamp(servo_value, -1.0, 1.0)
-
                 self.set_servo(servo_value)
 
                 print(
-                    f"FORWARD "
-                    f"angle={angle:7.2f}deg "
-                    f"imu={imu_correction:7.3f} "
-                    f"L={left_filtered if left_filtered is not None else -1:6.1f}cm "
-                    f"R={right_filtered if right_filtered is not None else -1:6.1f}cm "
-                    f"mode={tof_mode:15s} "
+                    f"FORWARD angle={angle:7.2f}deg "
+                    f"imu={imu_correction:6.3f} "
+                    f"L={last_left_cm if last_left_cm is not None else -1:6.1f}cm "
+                    f"R={last_right_cm if last_right_cm is not None else -1:6.1f}cm "
                     f"wall={last_wall_error if last_wall_error is not None else 0:7.1f} "
-                    f"wc={wall_correction:7.3f} "
-                    f"servo={servo_value:7.3f}",
+                    f"wc={wall_correction:6.3f} "
+                    f"servo={servo_value:6.3f}",
                     end="\r",
                 )
 
@@ -749,13 +537,9 @@ class RobotDriver:
 
             print()
             print(
-                f"FORWARD final: "
-                f"heading_error={angle:.2f} deg, "
-                f"left={left_filtered}, "
-                f"right={right_filtered}, "
-                f"tof_mode={tof_mode}, "
-                f"wall_error={last_wall_error}, "
-                f"wall_correction={last_wall_correction:.3f}"
+                f"FORWARD final heading error = {angle:.2f} deg, "
+                f"left={last_left_cm}, right={last_right_cm}, "
+                f"wall_error={last_wall_error}"
             )
 
     def start_left_turn_motors(self) -> None:
@@ -784,18 +568,6 @@ class RobotDriver:
         else:
             raise ValueError(f"Unknown turn_mode: {self.config.turn_mode}")
 
-    def get_left_turn_servo_value(self) -> float:
-        if self.config.turn_servo_mode == "CENTER":
-            return self.config.servo_center_value
-
-        return self.config.servo_left_value
-
-    def get_right_turn_servo_value(self) -> float:
-        if self.config.turn_servo_mode == "CENTER":
-            return self.config.servo_center_value
-
-        return self.config.servo_right_value
-
     def timed_turn_left_90(self) -> None:
         self.require_devices()
 
@@ -804,7 +576,7 @@ class RobotDriver:
         self.stop()
         time.sleep(self.config.stop_delay_seconds)
 
-        self.set_servo(self.get_left_turn_servo_value())
+        self.set_servo(self.config.servo_left_value)
         time.sleep(self.config.servo_settle_seconds)
 
         self.start_left_turn_motors()
@@ -824,7 +596,7 @@ class RobotDriver:
         self.stop()
         time.sleep(self.config.stop_delay_seconds)
 
-        self.set_servo(self.get_right_turn_servo_value())
+        self.set_servo(self.config.servo_right_value)
         time.sleep(self.config.servo_settle_seconds)
 
         self.start_right_turn_motors()
@@ -849,7 +621,7 @@ class RobotDriver:
         self.stop()
         time.sleep(self.config.stop_delay_seconds)
 
-        self.set_servo(self.get_left_turn_servo_value())
+        self.set_servo(self.config.servo_left_value)
         time.sleep(self.config.servo_settle_seconds)
 
         angle = 0.0
@@ -905,7 +677,7 @@ class RobotDriver:
         self.stop()
         time.sleep(self.config.stop_delay_seconds)
 
-        self.set_servo(self.get_right_turn_servo_value())
+        self.set_servo(self.config.servo_right_value)
         time.sleep(self.config.servo_settle_seconds)
 
         angle = 0.0

@@ -1,0 +1,11 @@
+[
+  { "type": "FORWARD" },
+  { "type": "FORWARD" },
+  { "type": "LEFT" },
+  { "type": "FORWARD" },
+  { "type": "FORWARD" },
+  { "type": "RIGHT" },
+  { "type": "FORWARD" },
+  { "type": "FORWARD" },
+  { "type": "STOP" }
+]

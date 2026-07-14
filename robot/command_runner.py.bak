@@ -168,7 +168,7 @@ def parse_args() -> argparse.Namespace:
         help="Delay between commands",
     )
 
-    parser.add_argument(
+        "--left-seconds",parser.add_argument(
         "--forward-seconds",
         type=float,
         default=0.70,
@@ -231,7 +231,7 @@ def parse_args() -> argparse.Namespace:
         help="Wait time after moving servo",
     )
 
-    parser.add_argument(
+        "--turn-mode",parser.add_argument(
         "--stop-delay-seconds",
         type=float,
         default=0.15,
@@ -245,7 +245,7 @@ def parse_args() -> argparse.Namespace:
             "STEER_AND_BOTH_FORWARD",
             "STEER_AND_DIFF",
         ],
-        default="STEER_AND_DIFF",
+        default="STEER_AND_ONE_SIDE",
         help="How to rotate during LEFT/RIGHT commands",
     )
 

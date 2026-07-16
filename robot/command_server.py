@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -84,7 +85,19 @@ class CommandHandler(SimpleHTTPRequestHandler):
         try:
             config = build_config(self.server.args)
             with RobotDriver(config=config, dry_run=not self.server.args.live) as driver:
-                run_commands(commands, driver, limit=None, step_delay=self.server.args.step_delay)
+                run_kwargs: dict[str, Any] = {
+                    "commands": commands,
+                    "driver": driver,
+                    "limit": None,
+                    "step_delay": self.server.args.step_delay,
+                }
+
+                # 新しいcommand_runner.pyでは連続FORWARDをまとめる設定が必須。
+                # 古い版との互換性も保つため、引数が存在するときだけ渡す。
+                if "merge_forward" in inspect.signature(run_commands).parameters:
+                    run_kwargs["merge_forward"] = self.server.args.merge_forward
+
+                run_commands(**run_kwargs)
         except Exception as error:
             print(f"ERROR while running received commands: {error}")
         finally:
@@ -101,6 +114,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--live", action="store_true", help="Actually drive GPIO; default is dry-run")
     parser.add_argument("--max-body-bytes", type=int, default=1_000_000)
     parser.add_argument("--step-delay", type=float, default=0.05)
+    parser.add_argument(
+        "--merge-forward",
+        action="store_true",
+        help="Merge consecutive FORWARD commands when supported by command_runner",
+    )
     parser.add_argument("--forward-seconds", type=float, default=0.70)
     parser.add_argument("--left-seconds", type=float, default=0.5)
     parser.add_argument("--right-seconds", type=float, default=0.5)

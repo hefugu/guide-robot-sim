@@ -65,6 +65,8 @@ let currentTargetMode = "IDLE";
 let sendingRequestId = null;
 
 const ROBOT_ENDPOINT_KEY = "guideRobotEndpointV1";
+const ROBOT_ENDPOINT = "http://192.168.11.48:8000";
+const OLD_DEFAULT_ENDPOINT = "http://raspberrypi.local:8765/commands";
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -769,8 +771,10 @@ async function init() {
   elements.gridRowsInput.value = String(appState.map.rows || 50);
   elements.cellSizeInput.value = String(appState.map.cellSizeCm || 50);
   elements.directionSelect.value = appState.robot.direction;
-  elements.robotEndpointInput.value = localStorage.getItem(ROBOT_ENDPOINT_KEY)
-    || elements.robotEndpointInput.value;
+  const savedRobotEndpoint = localStorage.getItem(ROBOT_ENDPOINT_KEY);
+  elements.robotEndpointInput.value = !savedRobotEndpoint || savedRobotEndpoint === OLD_DEFAULT_ENDPOINT
+    ? ROBOT_ENDPOINT
+    : savedRobotEndpoint;
 
   setTool("home");
 

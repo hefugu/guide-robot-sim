@@ -55,7 +55,7 @@ class CommandHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        if self.path.rstrip("/") != "/commands":
+        if self.path.rstrip("/") not in {"", "/commands"}:
             self._reply(404, {"error": "Not found"})
             return
         if not self.server.run_lock.acquire(blocking=False):
@@ -92,7 +92,7 @@ class CommandHandler(BaseHTTPRequestHandler):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Receive and execute guide robot command JSON")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--live", action="store_true", help="Actually drive GPIO; default is dry-run")
     parser.add_argument("--max-body-bytes", type=int, default=1_000_000)
     parser.add_argument("--step-delay", type=float, default=0.05)
@@ -113,7 +113,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     mode = "LIVE" if args.live else "DRY RUN"
-    print(f"Command server listening on http://{args.host}:{args.port}/commands ({mode})")
+    print(f"Command server listening on http://{args.host}:{args.port} ({mode})")
     CommandServer((args.host, args.port), CommandHandler, args).serve_forever()
 
 

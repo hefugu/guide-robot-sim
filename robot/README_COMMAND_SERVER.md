@@ -1,0 +1,19 @@
+# JSON自動受信
+
+ロボット（Raspberry Pi）側で、案内画面を使う前に次を実行します。
+
+```bash
+cd guide-robot-sim/robot
+python3 command_server.py --live
+```
+
+既定では `0.0.0.0:8765` で待ち受けます。GPIOを動かさず通信だけ確認する場合は、`--live` を外してください。
+
+親機画面の「ロボット送信先」には、通常は次のいずれかを指定します。
+
+```text
+http://raspberrypi.local:8765/commands
+http://<Raspberry PiのIPアドレス>:8765/commands
+```
+
+子機で「案内開始」を押すと、親機が経路を命令JSONへ変換してこのURLへ送信します。ロボットは受信を承認した直後に命令を実行します。実行中に別の命令を受けた場合は `409 Robot is already running` を返します。

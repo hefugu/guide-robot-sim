@@ -42,6 +42,7 @@ const elements = {
 
   btnResetAll: document.getElementById("btnResetAll"),
   btnClearLog: document.getElementById("btnClearLog"),
+  robotEndpointInput: document.getElementById("robotEndpointInput"),
 
   statusLabel: document.getElementById("statusLabel"),
   toolLabel: document.getElementById("toolLabel"),
@@ -61,6 +62,9 @@ let simulationTimer = null;
 let obstaclePauseTimer = null;
 let runningRequestId = null;
 let currentTargetMode = "IDLE";
+let sendingRequestId = null;
+
+const ROBOT_ENDPOINT_KEY = "guideRobotEndpointV1";
 
 function log(message) {
   const time = new Date().toLocaleTimeString();
@@ -201,6 +205,25 @@ function getCommandJsonForExport() {
   }
 
   return JSON.stringify(appState.commands.list ?? [], null, 2);
+}
+
+async function sendCommandsToRobot() {
+  const endpoint = elements.robotEndpointInput.value.trim();
+  if (!endpoint) throw new Error("ロボット送信先が設定されていません");
+
+  localStorage.setItem(ROBOT_ENDPOINT_KEY, endpoint);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: getCommandJsonForExport(),
+  });
+
+  let result = null;
+  try { result = await response.json(); } catch { /* HTTP statusで報告 */ }
+  if (!response.ok) {
+    throw new Error(result?.error || `ロボット送信失敗 (HTTP ${response.status})`);
+  }
+  log(`ロボットへJSONを送信しました (${result?.commandCount ?? appState.commands.list.length}命令)`);
 }
 
 async function copyCommandJson() {
@@ -583,7 +606,7 @@ function startSimulationLoop() {
   }, 260);
 }
 
-function startSimulationIfNeeded() {
+async function startSimulationIfNeeded() {
   if (!appState.request.active) {
     return;
   }
@@ -596,6 +619,8 @@ function startSimulationIfNeeded() {
     return;
   }
 
+  if (sendingRequestId === appState.request.id) return;
+
   const ok = calculateGuidePaths(appState);
 
   if (!ok) {
@@ -605,7 +630,19 @@ function startSimulationIfNeeded() {
 
   updateCommandsFromPaths();
 
-  runningRequestId = appState.request.id;
+  const requestId = appState.request.id;
+  sendingRequestId = requestId;
+  try {
+    await sendCommandsToRobot();
+  } catch (error) {
+    sendingRequestId = null;
+    setError(`案内開始失敗: ${error.message}`);
+    return;
+  }
+  sendingRequestId = null;
+  if (!appState.request.active || appState.request.id !== requestId) return;
+
+  runningRequestId = requestId;
   currentTargetMode = "TO_USER";
 
   appState.robot.position = appState.robot.home
@@ -646,7 +683,7 @@ async function syncFromStorage() {
   elements.cellSizeInput.value = String(appState.map.cellSizeCm);
   elements.directionSelect.value = appState.robot.direction;
 
-  startSimulationIfNeeded();
+  await startSimulationIfNeeded();
   render();
 }
 
@@ -732,6 +769,8 @@ async function init() {
   elements.gridRowsInput.value = String(appState.map.rows || 50);
   elements.cellSizeInput.value = String(appState.map.cellSizeCm || 50);
   elements.directionSelect.value = appState.robot.direction;
+  elements.robotEndpointInput.value = localStorage.getItem(ROBOT_ENDPOINT_KEY)
+    || elements.robotEndpointInput.value;
 
   setTool("home");
 

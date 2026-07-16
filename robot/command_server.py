@@ -95,7 +95,9 @@ class CommandHandler(SimpleHTTPRequestHandler):
                 # 新しいcommand_runner.pyでは連続FORWARDをまとめる設定が必須。
                 # 古い版との互換性も保つため、引数が存在するときだけ渡す。
                 if "merge_forward" in inspect.signature(run_commands).parameters:
-                    run_kwargs["merge_forward"] = self.server.args.merge_forward
+                    # 案内サーバー経由では直線区間を必ず連続走行する。
+                    # 1マスごとの停止は補正値と壁距離基準を毎回リセットするため禁止。
+                    run_kwargs["merge_forward"] = True
 
                 run_commands(**run_kwargs)
         except Exception as error:
@@ -114,12 +116,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--live", action="store_true", help="Actually drive GPIO; default is dry-run")
     parser.add_argument("--max-body-bytes", type=int, default=1_000_000)
     parser.add_argument("--step-delay", type=float, default=0.05)
-    parser.add_argument(
-        "--no-merge-forward",
-        action="store_false",
-        dest="merge_forward",
-        help="Stop after every FORWARD command instead of running straight sections continuously",
-    )
     parser.add_argument("--forward-seconds", type=float, default=0.70)
     parser.add_argument("--left-seconds", type=float, default=0.5)
     parser.add_argument("--right-seconds", type=float, default=0.5)

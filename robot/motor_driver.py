@@ -622,10 +622,14 @@ class RobotDriver:
             new_right_baseline,
         )
 
-    def forward_one_cell(self) -> None:
+    def forward_cells(self, cell_count: int = 1) -> None:
         self.require_devices()
 
-        print(f"FORWARD: {self.config.forward_one_cell_seconds:.2f}s")
+        if cell_count < 1:
+            raise ValueError("cell_count must be 1 or greater")
+
+        forward_seconds = self.config.forward_one_cell_seconds * cell_count
+        print(f"FORWARD x{cell_count}: {forward_seconds:.2f}s continuous")
 
         self.stop()
         time.sleep(self.config.stop_delay_seconds)
@@ -735,7 +739,7 @@ class RobotDriver:
                     end="\r",
                 )
 
-                if elapsed >= self.config.forward_one_cell_seconds:
+                if elapsed >= forward_seconds:
                     break
 
                 time.sleep(self.config.forward_loop_sleep)
@@ -783,6 +787,9 @@ class RobotDriver:
 
         else:
             raise ValueError(f"Unknown turn_mode: {self.config.turn_mode}")
+
+    def forward_one_cell(self) -> None:
+        self.forward_cells(1)
 
     def get_left_turn_servo_value(self) -> float:
         if self.config.turn_servo_mode == "CENTER":

@@ -115,9 +115,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-body-bytes", type=int, default=1_000_000)
     parser.add_argument("--step-delay", type=float, default=0.05)
     parser.add_argument(
-        "--merge-forward",
-        action="store_true",
-        help="Merge consecutive FORWARD commands when supported by command_runner",
+        "--no-merge-forward",
+        action="store_false",
+        dest="merge_forward",
+        help="Stop after every FORWARD command instead of running straight sections continuously",
     )
     parser.add_argument("--forward-seconds", type=float, default=0.70)
     parser.add_argument("--left-seconds", type=float, default=0.5)

@@ -115,6 +115,7 @@ def run_commands(
     driver: RobotDriver,
     limit: int | None,
     step_delay: float,
+    merge_forward: bool = True,
 ) -> None:
     total = len(commands)
 
@@ -129,9 +130,26 @@ def run_commands(
     print(f"Running {len(selected)} commands")
     print("=== RUN START ===")
 
-    for index, command in enumerate(selected, start=1):
-        print(f"{index:03d}: ", end="")
+    index = 0
+    while index < len(selected):
+        command = selected[index]
+
+        if merge_forward and command.get("type") == "FORWARD":
+            end = index + 1
+            while end < len(selected) and selected[end].get("type") == "FORWARD":
+                end += 1
+
+            cell_count = end - index
+            print(f"{index + 1:03d}-{end:03d}: FORWARD x{cell_count} (continuous)")
+            driver.forward_cells(cell_count)
+            if step_delay > 0:
+                time.sleep(step_delay)
+            index = end
+            continue
+
+        print(f"{index + 1:03d}: ", end="")
         execute_command(driver, command, step_delay)
+        index += 1
 
     print("=== RUN END ===")
 
@@ -166,6 +184,13 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.05,
         help="Delay between commands",
+    )
+
+    parser.add_argument(
+        "--no-merge-forward",
+        action="store_false",
+        dest="merge_forward",
+        help="Stop after every FORWARD command instead of running straight sections continuously",
     )
 
     parser.add_argument(
@@ -273,6 +298,7 @@ def main() -> int:
                 driver=driver,
                 limit=args.limit,
                 step_delay=args.step_delay,
+                merge_forward=args.merge_forward,
             )
 
     except KeyboardInterrupt:

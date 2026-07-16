@@ -7,6 +7,8 @@ cd guide-robot-sim/robot
 python3 command_server.py --live
 ```
 
+連続する `FORWARD` は既定でまとめて実行されるため、直線区間では1マスごとに停止しません。従来どおり1マスずつ停止させる場合だけ `--no-merge-forward` を付けます。
+
 既定では `0.0.0.0:8000` で待ち受けます。GPIOを動かさず通信だけ確認する場合は、`--live` を外してください。
 同じサーバーがプロジェクトの画面も配信するため、ブラウザでは `http://<Raspberry PiのIPアドレス>:8000/` を開けます。
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 from command_runner import build_config, run_commands
@@ -11,6 +12,7 @@ from motor_driver import RobotDriver
 
 
 ALLOWED_TYPES = {"FORWARD", "LEFT", "RIGHT", "STOP"}
+WEB_ROOT = Path(__file__).resolve().parent.parent
 
 
 def validate_commands(data: Any) -> list[dict[str, Any]]:
@@ -25,14 +27,17 @@ def validate_commands(data: Any) -> list[dict[str, Any]]:
 
 
 class CommandServer(ThreadingHTTPServer):
-    def __init__(self, address: tuple[str, int], handler: type[BaseHTTPRequestHandler], args: argparse.Namespace):
+    def __init__(self, address: tuple[str, int], handler: type[SimpleHTTPRequestHandler], args: argparse.Namespace):
         super().__init__(address, handler)
         self.args = args
         self.run_lock = threading.Lock()
 
 
-class CommandHandler(BaseHTTPRequestHandler):
+class CommandHandler(SimpleHTTPRequestHandler):
     server: CommandServer
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, directory=str(WEB_ROOT), **kwargs)
 
     def _cors_headers(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
